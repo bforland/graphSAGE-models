@@ -91,7 +91,3 @@ model_file_path = f"/dbfs/tmp/test_baseline.pkl"
 with open(model_file_path, "wb") as f:
     print(model_file_path)
     pickle.dump(model, f)
-
-# COMMAND ----------
-
-
