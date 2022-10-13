@@ -54,6 +54,7 @@ class Criterion(Enum):
     MARGIN_RANKING_LOSS = "ranking"
 
 @dataclass
+@dataclass
 class ModelConfig:
     dimensions: int = 64 # dimension of final embeddings 
     hidden_channels: int = 64 # dimension of hidden layers
@@ -61,10 +62,13 @@ class ModelConfig:
     criterion: Criterion = Criterion.BCE_LOSS # loss function
     embeddings_combine_strategy: EmbeddingsCombineStrategy =  EmbeddingsCombineStrategy.CONCAT
     customer_features: str = "default" # default or random
-    model_name: str = None
+    batch_size: int = 4096 # Number of batches
+    num_epochs: int = 1
+    learning_rate: float = 0.01
+    model_name: str = 'base_line'
     
     def __post_init__(self):
-        self.model_name = f"hetero_{self.customer_features}_cf_{self.criterion.value}_{self.embeddings_combine_strategy.value}_{self.dimensions}"+self.model_name
+        self.model_name = f"{self.model_name}_hetero_{self.customer_features}_cf_{self.criterion.value}_{self.embeddings_combine_strategy.value}_{self.dimensions}_bs{self.batch_size}_ep{self.num_epochs}_lr{str(self.learning_rate).split('.')[0]}p{str(self.learning_rate).split('.')[1]}"
         
 def weighted_mse_loss(pred, target, weight=None):
     weight = 1. if weight is None else weight[target].to(pred.dtype)

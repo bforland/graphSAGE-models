@@ -61,10 +61,13 @@ class ModelConfig:
     criterion: Criterion = Criterion.BCE_LOSS # loss function
     embeddings_combine_strategy: EmbeddingsCombineStrategy =  EmbeddingsCombineStrategy.CONCAT
     customer_features: str = "default" # default or random
-    model_name: str = None
+    batch_size: int = 4096 # Number of batches
+    num_epochs: int = 1
+    learning_rate: float = 0.01
+    model_name: str = ''
     
     def __post_init__(self):
-        self.model_name = f"hetero_{self.customer_features}_cf_{self.criterion.value}_{self.embeddings_combine_strategy.value}_{self.dimensions}"+self.model_name
+        self.model_name = f"{self.model_name}_hetero_{self.customer_features}_cf_{self.criterion.value}_{self.embeddings_combine_strategy.value}_{self.dimensions}_bs{self.batch_size}_ep{self.num_epochs}_lr{str(self.learning_rate).split('.')[0]}p{str(self.learning_rate).split('.')[1]}"
 
 def train(model, optimizer, config:ModelConfig, data=None, loader=None):
     
@@ -115,19 +118,19 @@ def predict(model, data, config):
                 combine_mode=config.embeddings_combine_strategy)
     return pred
 
-def train_test(model, train_loader, train_data, val_data, test_data, config, learning_rate=0.01, e_threshold=10, num_epochs=50, min_acc=0.005, epoch_save=False):
+def train_test(model, train_loader, train_data, val_data, test_data, config, e_threshold=10, min_acc=0.005, epoch_save=False):
     t0 = time.time()
     #model = Model(**model_params)
     
 
     with torch.no_grad():
         model.encoder(train_data.x_dict, train_data.edge_index_dict)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, betas=(0.9, 0.999), eps=1e-08, weight_decay=0.01, amsgrad=False)
-    #optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate, betas=(0.9, 0.999), eps=1e-08, weight_decay=0.01, amsgrad=False)
+    #optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
     #scheduler = ReduceLROnPlateau(optimizer, 'min', patience = 2, threshold=0.001, min_lr = 0.001)
     k=0
     losses = []
-    for epoch in range(1, num_epochs+1):
+    for epoch in range(1, config.num_epochs+1):
         loss = train(model,optimizer, config=config, loader=train_loader)
         val_loss = test(model, val_data, config)
         test_loss = test(model, test_data, config)
