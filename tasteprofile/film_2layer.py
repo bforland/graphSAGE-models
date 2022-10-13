@@ -1,11 +1,3 @@
-%sh
-pip install -U pip
-pip install torch-scatter -f https://data.pyg.org/whl/torch-1.11.0+cu113.html
-pip install torch-sparse -f https://data.pyg.org/whl/torch-1.11.0+cu113.html
-pip install torch-geometric
-pip install torch-cluster -f https://data.pyg.org/whl/torch-1.11.0+cu113.html
-pip install s3fs
-
 #import umap.umap_ as umap
 import matplotlib.pyplot as plt
 import seaborn as sns
