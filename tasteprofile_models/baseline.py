@@ -53,7 +53,7 @@ class Criterion(Enum):
     COSINE_EMBEDDING_LOSS = "cosine"
     MARGIN_RANKING_LOSS = "ranking"
 
-@dataclass
+
 @dataclass
 class ModelConfig:
     dimensions: int = 64 # dimension of final embeddings 
@@ -75,14 +75,14 @@ def weighted_mse_loss(pred, target, weight=None):
     return (weight * (pred - target.to(pred.dtype)).pow(2)).mean()
 
 def combine_embeddings(z_dict , edge_label_index, mode=EmbeddingsCombineStrategy.CONCAT):
-    if mode == EmbeddingsCombineStrategy.CONCAT:
+    if mode.value == EmbeddingsCombineStrategy.CONCAT.value:
         row, col = edge_label_index
         z = torch.cat([z_dict["customer"][row], z_dict["recipe"][col]], dim=-1)
-    elif mode == EmbeddingsCombineStrategy.PIECEWISE_PRODUCT:
+    elif mode.value == EmbeddingsCombineStrategy.PIECEWISE_PRODUCT.value:
         h_src = z_dict["customer"][edge_label_index[0]]
         h_dst = z_dict["recipe"][edge_label_index[1]]
         z = (h_src * h_dst)
-    elif mode == EmbeddingsCombineStrategy.COSINE_SIMILARITY:
+    elif mode.value == EmbeddingsCombineStrategy.COSINE_SIMILARITY.value:
         h_src = z_dict["customer"][edge_label_index[0]]
         h_dst = z_dict["recipe"][edge_label_index[1]]
         cos = torch.nn.CosineSimilarity(dim=1)
@@ -90,7 +90,7 @@ def combine_embeddings(z_dict , edge_label_index, mode=EmbeddingsCombineStrategy
         
     else:
         raise("Invalid input for combining embeddings")
-    return z             
+    return z                  
 
 class GNNEncoder(torch.nn.Module):
     def __init__(self, hidden_channels, out_channels, conv=SAGEConv):
@@ -99,14 +99,14 @@ class GNNEncoder(torch.nn.Module):
         self.conv2 = conv((-1, -1), out_channels)
 
     def forward(self, x, edge_index):
-        x = self.conv1(x, edge_index).relu()
-        x = self.conv2(x, edge_index)
+        x = self.conv1(x.double(), edge_index).relu()
+        x = self.conv2(x.double(), edge_index)
         return x
 
 class EdgeDecoder(torch.nn.Module):
     def __init__(self, hidden_channels):
         super().__init__()
-        self.lin1 = Linear(2*hidden_channels, hidden_channels)
+        self.lin1 = Linear(1*hidden_channels, hidden_channels)
         self.lin2 = Linear(hidden_channels, 1)
 
     def forward(self, z):
@@ -119,7 +119,7 @@ class Model(torch.nn.Module):
     def __init__(self, hidden_channels, conv=SAGEConv):
         super().__init__()
         self.encoder = GNNEncoder(hidden_channels, hidden_channels, conv)
-        self.encoder = to_hetero(self.encoder, pytorch_hetero_graph.metadata(), aggr='mean')
+        self.encoder = to_hetero(self.encoder, pytorch_hetero_graph.metadata())
         self.decoder = EdgeDecoder(hidden_channels)
 
     def forward(self, x_dict, edge_index_dict, edge_label_index, 

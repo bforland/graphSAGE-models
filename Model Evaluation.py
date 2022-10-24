@@ -3,6 +3,17 @@
 
 # COMMAND ----------
 
+# MAGIC %sh
+# MAGIC pip install networkx==2.8.6
+# MAGIC pip install -U pip
+# MAGIC pip install torch-scatter -f https://data.pyg.org/whl/torch-1.11.0+cu113.html
+# MAGIC pip install torch-sparse -f https://data.pyg.org/whl/torch-1.11.0+cu113.html
+# MAGIC pip install torch-geometric
+# MAGIC pip install torch-cluster -f https://data.pyg.org/whl/torch-1.11.0+cu113.html
+# MAGIC pip install s3fs
+
+# COMMAND ----------
+
 # MAGIC %md ## Imports
 
 # COMMAND ----------
@@ -25,6 +36,8 @@ from pyspark.sql.window import Window
 from pyspark.sql import SparkSession
 import pyspark.sql.functions as F
 
+import torch_geometric.transforms as T
+
 from sklearn.metrics.pairwise import cosine_similarity
 
 import os, sys
@@ -40,24 +53,12 @@ import random
 
 # COMMAND ----------
 
-# MAGIC %sh
-# MAGIC pip install -U pip
-# MAGIC pip install torch-scatter -f https://data.pyg.org/whl/torch-1.11.0+cu113.html
-# MAGIC pip install torch-sparse -f https://data.pyg.org/whl/torch-1.11.0+cu113.html
-# MAGIC pip install torch-geometric
-# MAGIC pip install torch-cluster -f https://data.pyg.org/whl/torch-1.11.0+cu113.html
-# MAGIC pip install s3fs
-
-# COMMAND ----------
-
 sys.path.append("/Workspace/Repos/blake.forland@hellofresh.com/graphSAGE-models")
 
 # COMMAND ----------
 
-from tasteprofile import baseline
+from tasteprofile_models import baseline
 #from tasteprofile import linkprediction
-
-# COMMAND ----------
 
 importlib.reload(baseline)
 #importlib.reload(linkprediction)
@@ -348,26 +349,39 @@ def define_model_test_data(temp_model, data):
 
 # COMMAND ----------
 
-with open(f"/dbfs/tmp/test_baseline.pkl", "rb") as f:
+with open(f"/dbfs/tmp/base_line_hetero_default_cf_bce_logits_piecewise_product_64_bs4096_ep20_lr0p01_MUL.pkl", "rb") as f:
     model = pickle.load(f)
 
 # COMMAND ----------
 
-with open(f"/dbfs/tmp/train_val_test.pkl", "rb") as f:
-    data = pickle.load(f)
+with open("/dbfs/tmp/pytorch_hetero_09_22_50M.pkl", "rb") as f:
+    pytorch_hetero_graph = pickle.load(f)
 
 # COMMAND ----------
 
-train_data = data['train_data']
-val_data = data['val_data']
-test_data = data['test_data']
+train_data, val_data, test_data = T.RandomLinkSplit(
+    num_val=0.1,
+    num_test=0.1,
+    add_negative_train_samples=False,
+    neg_sampling_ratio=0.0,
+    edge_types=[('customer', 'to', 'recipe')],
+    rev_edge_types=[('recipe', 'rev_to', 'customer')],
+)(pytorch_hetero_graph)
+
+# COMMAND ----------
+
+#with open(f"/dbfs/tmp/train_val_test.pkl", "rb") as f:
+#    data = pickle.load(f)
+#train_data = data['train_data']
+#val_data = data['val_data']
+#test_data = data['test_data']
 
 # COMMAND ----------
 
 # For mapping node ids in networkx graph to pytorch graph
 new_graph = nx.read_gpickle("/dbfs/tmp/nx_graph_for_pytorch_hetero.gpickle")
 customer_node_map = [int(''.join(node_id[1:])) for node_id, node_data in new_graph.nodes(data=True) if node_data.get('type') == 'customer']
-recipe_node_map = [node_id for node_id, node_data in new_graph.nodes(data=True) if node_data.get('type') == 'recipe'] 
+recipe_node_map = [node_id for node_id, node_data in new_graph.nodes(data=True) if node_data.get('type') == 'recipe']  
 
 # COMMAND ----------
 
@@ -378,14 +392,14 @@ recipe_node_map_df = recipe_node_map_df.reset_index().rename(columns={"index": "
 
 # COMMAND ----------
 
-test_weeks=['2022-W25']#, '2022-W26', '2022-W27', '2022-W28', '2022-W29']
+test_weeks=['2022-W25', '2022-W26', '2022-W27', '2022-W28', '2022-W29']
 for week in test_weeks:
     print(week)
     recipes_to_rank_by_week(week, 'test_baseline', customer_node_map_df, recipe_node_map_df)
 
 # COMMAND ----------
 
-test_weeks=['2022-W25']#, '2022-W26', '2022-W27', '2022-W28', '2022-W29']
+test_weeks=['2022-W25', '2022-W26', '2022-W27', '2022-W28', '2022-W29']
 for week in test_weeks:
     run_predict_by_test_week(week, 'test_baseline')
     evaluate_uptake_probs(week, 'test_baseline')

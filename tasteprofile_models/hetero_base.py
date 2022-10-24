@@ -75,14 +75,14 @@ def weighted_mse_loss(pred, target, weight=None):
     return (weight * (pred - target.to(pred.dtype)).pow(2)).mean()
 
 def combine_embeddings(z_dict , edge_label_index, mode=EmbeddingsCombineStrategy.CONCAT):
-    if mode == EmbeddingsCombineStrategy.CONCAT:
+    if mode.value == EmbeddingsCombineStrategy.CONCAT.value:
         row, col = edge_label_index
         z = torch.cat([z_dict["customer"][row], z_dict["recipe"][col]], dim=-1)
-    elif mode == EmbeddingsCombineStrategy.PIECEWISE_PRODUCT:
+    elif mode.value == EmbeddingsCombineStrategy.PIECEWISE_PRODUCT.value:
         h_src = z_dict["customer"][edge_label_index[0]]
         h_dst = z_dict["recipe"][edge_label_index[1]]
         z = (h_src * h_dst)
-    elif mode == EmbeddingsCombineStrategy.COSINE_SIMILARITY:
+    elif mode.value == EmbeddingsCombineStrategy.COSINE_SIMILARITY.value:
         h_src = z_dict["customer"][edge_label_index[0]]
         h_dst = z_dict["recipe"][edge_label_index[1]]
         cos = torch.nn.CosineSimilarity(dim=1)
@@ -90,7 +90,7 @@ def combine_embeddings(z_dict , edge_label_index, mode=EmbeddingsCombineStrategy
         
     else:
         raise("Invalid input for combining embeddings")
-    return z             
+    return z                
 
 class GNNEncoder(torch.nn.Module):
     def __init__(self, hidden_channels, out_channels, conv=SAGEConv):
